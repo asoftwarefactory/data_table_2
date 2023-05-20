@@ -361,7 +361,8 @@ class AsyncPaginatedDataTable2 extends PaginatedDataTable2 {
       super.border,
       super.autoRowsToHeight = false,
       super.smRatio = 0.67,
-      super.lmRatio = 1.2});
+      super.lmRatio = 1.2,
+      super.enableProgressIndicatorWhenRowsIsEmpty});
 
   /// Widget that is goin to be displayed while loading is in progress
   /// If no widget is specified the following defaul widget will be disoplayed:
