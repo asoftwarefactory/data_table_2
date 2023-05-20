@@ -205,6 +205,7 @@ class PaginatedDataTable2 extends StatefulWidget {
     this.autoRowsToHeight = false,
     this.smRatio = 0.67,
     this.lmRatio = 1.2,
+    this.enableProgressIndicatorWhenRowsIsEmpty = true,
   })  : assert(actions == null || (header != null)),
         assert(columns.isNotEmpty),
         assert(sortColumnIndex == null ||
@@ -463,6 +464,9 @@ class PaginatedDataTable2 extends StatefulWidget {
   /// Exposes scroll controller of the SingleChildScrollView that makes data rows horizontally scrollable
   final ScrollController? horizontalScrollController;
 
+  /// enable Progress Indicator When Rows Is Empty
+  final bool enableProgressIndicatorWhenRowsIsEmpty;
+
   @override
   PaginatedDataTable2State createState() => PaginatedDataTable2State();
 }
@@ -571,13 +575,17 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
         widget.columns.map<DataCell>((DataColumn column) {
       if (!column.numeric) {
         haveProgressIndicator = true;
-        return const DataCell(CircularProgressIndicator());
+        return DataCell(widget.enableProgressIndicatorWhenRowsIsEmpty
+            ? const CircularProgressIndicator()
+            : const SizedBox());
       }
       return DataCell.empty;
     }).toList();
     if (!haveProgressIndicator) {
       haveProgressIndicator = true;
-      cells[0] = const DataCell(CircularProgressIndicator());
+      cells[0] = DataCell(widget.enableProgressIndicatorWhenRowsIsEmpty
+          ? const CircularProgressIndicator()
+          : const SizedBox());
     }
     return DataRow.byIndex(
       index: index,
