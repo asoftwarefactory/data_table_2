@@ -166,10 +166,16 @@ class PaginatedDataTable2 extends StatefulWidget {
     this.sortAscending = true,
     this.sortArrowAnimationDuration = const Duration(milliseconds: 150),
     this.sortArrowIcon = Icons.arrow_upward,
+    this.sortArrowBuilder,
+    this.sortArrowAlwaysVisible = false,
     this.onSelectAll,
+    this.dataTextStyle,
     this.dataRowHeight = kMinInteractiveDimension,
+    this.datarowCheckboxTheme,
+    this.headingTextStyle,
     this.headingRowHeight = 56.0,
     this.headingRowColor,
+    this.headingCheckboxTheme,
     this.horizontalMargin = 24.0,
     this.columnSpacing = 56.0,
     this.dividerThickness,
@@ -193,6 +199,7 @@ class PaginatedDataTable2 extends StatefulWidget {
     this.dragStartBehavior = DragStartBehavior.start,
     required this.source,
     this.checkboxHorizontalMargin,
+    this.checkboxAlignment = Alignment.center,
     this.wrapInCard = true,
     this.minWidth,
     this.fit = FlexFit.tight,
@@ -206,6 +213,7 @@ class PaginatedDataTable2 extends StatefulWidget {
     this.smRatio = 0.67,
     this.lmRatio = 1.2,
     this.enableProgressIndicatorWhenRowsIsEmpty = true,
+    this.headingRowDecoration,
   })  : assert(actions == null || (header != null)),
         assert(columns.isNotEmpty),
         assert(sortColumnIndex == null ||
@@ -263,6 +271,14 @@ class PaginatedDataTable2 extends StatefulWidget {
   /// If not set, the default icon is [Icons.arrow_upward]
   final IconData sortArrowIcon;
 
+  /// This used in combination with [sortArrowBuilder] to create a custom sort arrow widget behavior.
+  /// If this is set to true the [sortArrowBuilder] will run for all columns that have [onSort] != null.
+  final bool sortArrowAlwaysVisible;
+
+  /// A builder for the sort arrow widget. Can be used in combination with [sortArrowAlwaysVisible] for a custom
+  /// sort arrow behavior. If this is used [sortArrowIcon], [sortArrowAnimationDuration] will be ignored.
+  final Widget Function(bool ascending, bool sorted)? sortArrowBuilder;
+
   /// Invoked when the user selects or unselects every row, using the
   /// checkbox in the heading row.
   ///
@@ -279,6 +295,27 @@ class PaginatedDataTable2 extends StatefulWidget {
   ///
   /// This value is optional and defaults to 56.0 if not specified.
   final double headingRowHeight;
+
+  /// The theme for the heading row checkboxes.
+  ///
+  /// If null, [DataTableThemeData.headingCheckboxTheme] is used.
+  final CheckboxThemeData? headingCheckboxTheme;
+
+  /// Overrides theme of the checkbox that is displayed in the checkbox column
+  /// in each data row (should checkboxes be enabled)
+  final CheckboxThemeData? datarowCheckboxTheme;
+
+  /// The text style for data rows.
+  ///
+  /// If null, [DataTableThemeData.dataTextStyle] is used. By default, the text
+  /// style is [TextTheme.bodyMedium].
+  final TextStyle? dataTextStyle;
+
+  /// The text style for the heading row.
+  ///
+  /// If null, [DataTableThemeData.headingTextStyle] is used. By default, the
+  /// text style is [TextTheme.titleSmall].
+  final TextStyle? headingTextStyle;
 
   /// {@template flutter.material.dataTable.headingRowColor}
   /// The background color for the heading row.
@@ -310,6 +347,10 @@ class PaginatedDataTable2 extends StatefulWidget {
   ///    <https://material.io/design/interaction/states.html#anatomy>.
   /// {@endtemplate}
   final MaterialStateProperty<Color?>? headingRowColor;
+
+  /// If set this field will override the current BoxDecoration.
+  /// It takes precedence over headerRowColor when both are provided.
+  final BoxDecoration? headingRowDecoration;
 
   /// The horizontal margin between the edges of the table and the content
   /// in the first and last cells of each row.
@@ -361,7 +402,8 @@ class PaginatedDataTable2 extends StatefulWidget {
 
   /// The options to offer for the rowsPerPage.
   ///
-  /// The current [rowsPerPage] must be a value in this list.
+  /// The current [rowsPerPage] must be a value in this list. Options that
+  /// are larger than total number of avaialble rows will be hidden.
   ///
   /// The values in this list should be sorted in ascending order.
   final List<int> availableRowsPerPage;
@@ -388,6 +430,10 @@ class PaginatedDataTable2 extends StatefulWidget {
   /// of the table and the checkbox, as well as the margin between the checkbox
   /// and the content in the first data column. This value defaults to 24.0.
   final double? checkboxHorizontalMargin;
+
+  /// Alignment of the checkbox if it is displayed
+  /// Defaults to the [Alignment.center]
+  final Alignment checkboxAlignment;
 
   /// If set, the table will stop shrinking below the threshold and provide
   /// horizontal scrolling. Useful for the cases with narrow screens (e.g. portrait phone orientation)
@@ -727,6 +773,7 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
           sortAscending: widget.sortAscending,
           sortArrowIcon: widget.sortArrowIcon,
           sortArrowAnimationDuration: widget.sortArrowAnimationDuration,
+          sortArrowBuilder: widget.sortArrowBuilder,
           onSelectAll: widget.onSelectAll,
           // Make sure no decoration is set on the DataTable
           // from the theme, as its already wrapped in a Card.
@@ -736,11 +783,17 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
           fixedTopRows: widget.fixedTopRows,
           fixedColumnsColor: widget.fixedColumnsColor,
           fixedCornerColor: widget.fixedCornerColor,
+          dataTextStyle: widget.dataTextStyle,
           dataRowHeight: widget.dataRowHeight,
+          headingTextStyle: widget.headingTextStyle,
           headingRowColor: widget.headingRowColor,
+          headingRowDecoration: widget.headingRowDecoration,
           headingRowHeight: widget.headingRowHeight,
+          headingCheckboxTheme: widget.headingCheckboxTheme,
+          datarowCheckboxTheme: widget.datarowCheckboxTheme,
           horizontalMargin: widget.horizontalMargin,
           checkboxHorizontalMargin: widget.checkboxHorizontalMargin,
+          checkboxAlignment: widget.checkboxAlignment,
           columnSpacing: widget.columnSpacing,
           showCheckboxColumn: widget.showCheckboxColumn,
           showBottomBorder: true,
@@ -776,9 +829,8 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
       }).toList();
       if (!widget.autoRowsToHeight) {
         footerWidgets.addAll(<Widget>[
-          Container(
-              width:
-                  14.0), // to match trailing padding in case we overflow and end up scrolling
+          Container(width: 14.0),
+          // to match trailing padding in case we overflow and end up scrolling
           Text(localizations.rowsPerPageTitle),
           ConstrainedBox(
             constraints: const BoxConstraints(
@@ -856,8 +908,6 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
       child: IconTheme.merge(
         data: const IconThemeData(opacity: 0.54),
         child: SizedBox(
-          // TODO(bkonyi): this won't handle text zoom correctly,
-          //  https://github.com/flutter/flutter/issues/48522
           height: 56.0,
           child: SingleChildScrollView(
             dragStartBehavior: widget.dragStartBehavior,
@@ -891,7 +941,6 @@ class PaginatedDataTable2State extends State<PaginatedDataTable2> {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(ianh): This whole build function doesn't handle RTL yet.
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
         bool isHeaderPresent = widget.header != null || widget.actions != null;

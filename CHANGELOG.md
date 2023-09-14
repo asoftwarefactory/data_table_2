@@ -1,3 +1,32 @@
+## 2.5.8
+- Added `headingRowDecoration` property to allow more customizations to heading row style (PR #220)
+
+## 2.5.7
+- `availableRowsPerPage` inline docs update
+- Fix wrong parameter name in AsyncDataTableSource.getRow method (PR #208)
+- PaginatedDataTable2 and AsyncPaginatedDataTable2 received extra params (headingTextStyle, dataTextStyle, headingCheckboxTheme, datarowCheckboxTheme)
+
+## 2.5.6
+- Fixed `DataRow2.specificRowHeight` when used with `AsyncPaginatedDataTable2`
+
+## 2.5.5
+- Added `checkboxAlignment` to widgets
+- Customizing checkboxes in DataTable2 via `headingCheckboxTheme` and `datarowCheckboxTheme`
+
+## 2.5.4
+- Custom arrow builder for heading cells (`sortArrowBuilder`)
+
+## 2.5.3
+- Exposed clipBehavior in DataTable2
+
+## 2.5.2
+- Reverting back to dataRowHeight instead of min/max (issue #191)
+
+## 2.5.1
+- 2 properties at DataTable2 allowing explicit visibility control of vertical/horizontal scrollbars
+- Passing visibility and thickness from scroll bar theme to iOS/Cupertino widget (Flutter SDK doesn't allow to fix that properties via themes)
+- Fix of scroll bars visibility on iOS (#140, #192) - now one can use either explicit properties of scroll bar themes
+
 ## 2.5.0
 - SDK constraint is set to minimum Dart 3
 - Switch to dataRowMinHeight and dataRowMaxHeight (deprecating dataRowHeight and aligning with DataTable from Flutter 3.10.0)

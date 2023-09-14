@@ -20,6 +20,7 @@ Please check the [example folder](https://github.com/maxim-saplin/data_table_2/t
   - Sticky left columns `DataTable2.fixedLeftColumns`
 - Vertically scrollable main area (with data rows)
   - `autoRowsToHeight` property on PaginatedDataTable2 allows to auto calculate page size depending on how much rows fit the height and makes vertical scrolling unnecessary
+  - Vertical and horizontal scroll visibility via `isVerticalScrollBarVisible` and `isHorizontalScrollBarVisible`
 - All columns are fixed width, table automatically stretches horizontally, individual column's width is determined as **(Width)/(Number of Columns)**
   - Should you want to adjust sizes of columns, you can replace `DataColumn` definitions with `DataColumn2` (which is a descendant of DataColumn). The class provides `size` property which can be set to one of 3 relative sizes (S, M and L)
   - Width ratios between Small and Medium, Large and Medium columns are defined by `smRatio` and `lmRatio` params
@@ -33,7 +34,8 @@ Please check the [example folder](https://github.com/maxim-saplin/data_table_2/t
 - There's `DataRow2` alternative to stock `DataRow` which provides row level tap events (including right clicks)
   - `PaginatedDataTable2.renderEmptyRowsInTheEnd` property changes the default Flutter way of rendering pages with empty rows
   - `DataRow2.specificRowHeight` allows overriding default height for any row
-- Overriding sort arrows via `sortArrowIcon` and `sortArrowAnimationDuration` properties
+- Overriding sort arrows via `sortArrowIcon` and `sortArrowAnimationDuration` properties, custom arrow builder with `sortArrowBuilder`
+- Customizing checkboxes in DataTable2 via `headingCheckboxTheme`, `datarowCheckboxTheme` and `checkboxAlignment`
 - `empty` property which allows defining a placeholder widget to be displayed when data source is empty
 - `border` allows drawing inner and outer vertical and horizontal borders (e.g. outlining individual cells) - stock widgets only allow drawing horizontal row splitters
 - `PaginatorController` allows to externally control `PaginatedDataTable2` state (e.g. switch pages, change page size etc.)
@@ -106,9 +108,9 @@ If you're already using the standard widgets you can reference the package and a
 
 ##  Know issues/limitations/caveats
 - There's no capability to size data table cells to fit contents. Column width's adapt to available width (either to parent width or `minWidth`), data rows width are predefined by constructor params. Content that doesn't fit a cell gets clipped
+  - dataRowMinHeight and dataRowMaxHeight from the stock data table are also not supported
 - There're no expanding/collapsing rows (drill-down scenarios), manually moving or resizing columns or rows, merging cells (i.e. HTML's colspan, rowspan)
 - When fixing left columns, hovering over a row won't highlight entire row (should there be any tap handlers standard behavior is hovering a row changes it background)
- - With fixed top rows and left columns hovering over actionable data rows their highlighted background can be displayed behind fixed sections
  - Touch scrolling not working/jumping under mobile device emulation in Chrome (https://github.com/maxim-saplin/data_table_2/issues/100)
  - Cell and row tap events block `DataRow.onSelectChanged` event handler
  - In order to get checkbox column visible it is necessary to have `DataTable2.showCheckboxColumn` set to true AND there must be some rows with `onSelectChanged` event handler being not null

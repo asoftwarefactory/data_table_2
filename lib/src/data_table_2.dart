@@ -8,7 +8,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 
 bool dataTableShowLogs = true;
 
@@ -97,8 +96,8 @@ class DataRow2 extends DataRow {
   /// Row double tap handler, won't be called if tapped cell has any tap event handlers
   final GestureTapCallback? onDoubleTap;
 
-  // /// Row long press handler, won't be called if tapped cell has any tap event handlers
-  // final GestureLongPressCallback? onLongPress;
+// /// Row long press handler, won't be called if tapped cell has any tap event handlers
+// final GestureLongPressCallback? onLongPress;
 }
 
 /// In-place replacement of standard [DataTable] widget, mimics it API.
@@ -116,23 +115,29 @@ class DataTable2 extends DataTable {
     super.onSelectAll,
     super.decoration,
     super.dataRowColor,
-    super.dataRowHeight,
+    this.dataRowHeight,
     super.dataTextStyle,
     super.headingRowColor,
     this.fixedColumnsColor,
     this.fixedCornerColor,
     super.headingRowHeight,
     super.headingTextStyle,
+    this.headingCheckboxTheme,
+    this.datarowCheckboxTheme,
     super.horizontalMargin,
     super.checkboxHorizontalMargin,
+    this.checkboxAlignment = Alignment.center,
     this.bottomMargin,
     super.columnSpacing,
     super.showCheckboxColumn = true,
     super.showBottomBorder = false,
     super.dividerThickness,
+    super.clipBehavior,
     this.minWidth,
     this.scrollController,
     this.horizontalScrollController,
+    this.isVerticalScrollBarVisible,
+    this.isHorizontalScrollBarVisible,
     this.empty,
     this.border,
     this.smRatio = 0.67,
@@ -141,16 +146,11 @@ class DataTable2 extends DataTable {
     this.lmRatio = 1.2,
     this.sortArrowAnimationDuration = const Duration(milliseconds: 150),
     this.sortArrowIcon = Icons.arrow_upward,
+    this.sortArrowBuilder,
+    this.headingRowDecoration,
     required super.rows,
   })  : assert(fixedLeftColumns >= 0),
-        assert(fixedTopRows >= 0) {
-    // // Fix for #111, syncrhonize scroll position for left fixed column with core
-    // // Works fine if there's scrollCongtroller provided externally, allows to avoid jumping
-    // _leftColumnVerticalContoller = ScrollController(
-    //     initialScrollOffset: _coreVerticalController.positions.isNotEmpty
-    //         ? _coreVerticalController.offset
-    //         : 0.0);
-  }
+        assert(fixedTopRows >= 0);
 
   static final LocalKey _headingRowKey = UniqueKey();
 
@@ -191,24 +191,67 @@ class DataTable2 extends DataTable {
   final Duration sortArrowAnimationDuration;
 
   /// Icon to be displayed when sorting is applied to a column.
-  /// If not set, the default icon is [Icons.arrow_upward]
+  /// If not set, the default icon is [Icons.arrow_upward].
+  /// When set always overrides/preceeds default arrow icons.
   final IconData sortArrowIcon;
+
+  /// A builder for the sort arrow widget. Can be used in combination with [sortArrowAlwaysVisible] for a custom
+  /// sort arrow behavior. If this is used [sortArrowIcon], [sortArrowAnimationDuration] will be ignored.
+  final Widget? Function(bool ascending, bool sorted)? sortArrowBuilder;
 
   /// If set, the table will stop shrinking below the threshold and provide
   /// horizontal scrolling. Useful for the cases with narrow screens (e.g. portrait phone orientation)
   /// and lots of columns (that get messed with little space)
   final double? minWidth;
 
+  /// Overrides theme of the checkbox that is displayed in the leftmost corner
+  /// of the heading (should checkboxes be enabled)
+  final CheckboxThemeData? headingCheckboxTheme;
+
+  /// Alignment of the checkbox if it is displayed
+  /// Defaults to the [Alignment.center]
+  final Alignment checkboxAlignment;
+
+  /// Overrides theme of the checkbox that is displayed in the checkbox column
+  /// in each data row (should checkboxes be enabled)
+  final CheckboxThemeData? datarowCheckboxTheme;
+
   /// If set the table will have empty space added after the the last row and allow scroll the
   /// core of the table higher (e.g. if you would like to have iOS navigation UI at the bottom overlapping the table and
   /// have the ability to slightly scroll up the bototm row to avoid the obstruction)
   final double? bottomMargin;
+
+  /// Overrides default [BoxDecoration](bottom border) applied to heading row.
+  /// When both [headerRowColor] and this porperty are provided:
+  /// - [headingRowDecoration] takes precedence if there're 0 or 1 fixed rows
+  /// - [headerRowColor] is applied to fixed top forws starting from the second
+  /// When there're both fixed top rows and fixed left columns with [fixedCornerColor] provided,
+  /// this decoration overrides top left cornner cell color.
+  final BoxDecoration? headingRowDecoration;
+
+  /// The height of each row (excluding the row that contains column headings).
+  ///
+  /// If null, [DataTableThemeData.dataRowMinHeight] is used. This value defaults
+  /// to [kMinInteractiveDimension] to adhere to the Material Design
+  /// specifications.
+  ///
+  /// Note that unlike stock [DataTable] from the SDK there's no capability to define min/max
+  /// height of a row, corresponding properties are ingored. This is an implementation tradeoff
+  /// making it possible to have performant sticky columns.
+  @override
+  final double? dataRowHeight;
 
   /// Exposes scroll controller of the SingleChildScrollView that makes data rows vertically scrollable
   final ScrollController? scrollController;
 
   /// Exposes scroll controller of the SingleChildScrollView that makes data rows horizontally scrollable
   final ScrollController? horizontalScrollController;
+
+  /// Determines whether the vertical scroll bar is visible, for iOS takes value from scrollbarTheme when null
+  final bool? isVerticalScrollBarVisible;
+
+  /// Determines whether the horizontal scroll bar is visible, for iOS takes value from scrollbarTheme when null
+  final bool? isHorizontalScrollBarVisible;
 
   /// Placeholder widget which is displayed whenever the data rows are empty.
   /// The widget will be displayed below column
@@ -254,16 +297,18 @@ class DataTable2 extends DataTable {
   final Color? fixedCornerColor;
 
   (double, double) getMinMaxRowHeight(DataTableThemeData dataTableTheme) {
-    final double effectiveDataRowMinHeight = dataRowMinHeight ??
-        dataTableTheme.dataRowMinHeight ??
+    final double effectiveDataRowMinHeight = dataRowHeight ??
         dataTableTheme.dataRowMinHeight ??
         kMinInteractiveDimension;
-    final double effectiveDataRowMaxHeight = dataRowMaxHeight ??
-        dataTableTheme.dataRowMaxHeight ??
-        dataTableTheme.dataRowMaxHeight ??
-        kMinInteractiveDimension;
+    // Reverting min/max csupport to single row height value in order not to have troubles
+    // with sticky column cells
+    // https://github.com/maxim-saplin/data_table_2/issues/191
+    // final double effectiveDataRowMaxHeight = dataRowMaxHeight ??
+    //     dataTableTheme.dataRowMaxHeight ??
+    //     dataTableTheme.dataRowMaxHeight ??
+    //     kMinInteractiveDimension;
 
-    return (effectiveDataRowMinHeight, effectiveDataRowMaxHeight);
+    return (effectiveDataRowMinHeight, effectiveDataRowMinHeight);
   }
 
   Widget _buildCheckbox(
@@ -272,6 +317,7 @@ class DataTable2 extends DataTable {
       required VoidCallback? onRowTap,
       required ValueChanged<bool?>? onCheckboxChanged,
       required MaterialStateProperty<Color?>? overlayColor,
+      required CheckboxThemeData? checkboxTheme,
       required bool tristate,
       required double? rowHeight}) {
     final DataTableThemeData dataTableTheme = DataTableTheme.of(context);
@@ -284,6 +330,7 @@ class DataTable2 extends DataTable {
         getMinMaxRowHeight(dataTableTheme);
 
     Widget wrapInContainer(Widget child) => Container(
+        alignment: checkboxAlignment,
         constraints: BoxConstraints(
             minHeight: rowHeight ?? effectiveDataRowMinHeight,
             maxHeight: rowHeight ?? effectiveDataRowMaxHeight),
@@ -295,13 +342,15 @@ class DataTable2 extends DataTable {
 
     Widget contents = Semantics(
       container: true,
-      child: wrapInContainer(Center(
-        child: Checkbox(
-          value: checked,
-          onChanged: onCheckboxChanged,
-          tristate: tristate,
-        ),
-      )),
+      child: wrapInContainer(
+        Theme(
+            data: ThemeData(checkboxTheme: checkboxTheme),
+            child: Checkbox(
+              value: checked,
+              onChanged: onCheckboxChanged,
+              tristate: tristate,
+            )),
+      ),
     );
     if (onRowTap != null) {
       contents = TableRowInkWell(
@@ -326,17 +375,21 @@ class DataTable2 extends DataTable {
       required double effectiveHeadingRowHeight,
       required MaterialStateProperty<Color?>? overlayColor}) {
     final ThemeData themeData = Theme.of(context);
+
+    var customArrows =
+        sortArrowBuilder != null ? sortArrowBuilder!(ascending, sorted) : null;
     label = Row(
       textDirection: numeric ? TextDirection.rtl : null,
       children: <Widget>[
         Flexible(child: label),
         if (onSort != null) ...<Widget>[
-          _SortArrow(
-            visible: sorted,
-            up: sorted ? ascending : null,
-            duration: sortArrowAnimationDuration,
-            sortArrowIcon: sortArrowIcon,
-          ),
+          customArrows ??
+              _SortArrow(
+                visible: sorted,
+                up: sorted ? ascending : null,
+                duration: sortArrowAnimationDuration,
+                sortArrowIcon: sortArrowIcon,
+              ),
           const SizedBox(width: _sortArrowPadding),
         ],
       ],
@@ -465,7 +518,7 @@ class DataTable2 extends DataTable {
         onRowSecondaryTap != null ||
         onRowSecondaryTapDown != null) {
       // row level
-      label = _TableRowInkWell(
+      label = TableRowInkWell(
         onTap: onRowTap ?? onSelectChanged,
         onDoubleTap: onRowDoubleTap,
         onLongPress: onRowLongPress,
@@ -930,7 +983,21 @@ class DataTable2 extends DataTable {
                           children: [t, SizedBox(height: bottomMargin!)])
                       : t;
 
+              var scrollBarTheme = Theme.of(context).scrollbarTheme;
+              // flutter/lib/src/material/scrollbar.dart, scrollbar decides whther to create  Cupertino or Material scrollbar, Cupertino ignores themes
+              var isiOS = Theme.of(context).platform == TargetPlatform.iOS;
+
+              // For iOS/Cupertino scrollbar
               fixedRowsAndCoreCol = Scrollbar(
+                  thumbVisibility: isHorizontalScrollBarVisible ??
+                      (isiOS
+                          ? scrollBarTheme.thumbVisibility
+                              ?.resolve({MaterialState.hovered})
+                          : null),
+                  thickness: (isiOS
+                      ? scrollBarTheme.thickness
+                          ?.resolve({MaterialState.hovered})
+                      : null),
                   controller: coreHorizontalController,
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     ScrollConfiguration(
@@ -951,13 +1018,24 @@ class DataTable2 extends DataTable {
                                   ))),
                     Flexible(
                         fit: FlexFit.tight,
-                        child: SingleChildScrollView(
+                        child: Scrollbar(
+                            thumbVisibility: isVerticalScrollBarVisible ??
+                                (isiOS
+                                    ? scrollBarTheme.thumbVisibility
+                                        ?.resolve({MaterialState.hovered})
+                                    : null),
+                            thickness: (isiOS
+                                ? scrollBarTheme.thickness
+                                    ?.resolve({MaterialState.hovered})
+                                : null),
                             controller: coreVerticalController,
-                            scrollDirection: Axis.vertical,
                             child: SingleChildScrollView(
-                                controller: coreHorizontalController,
-                                scrollDirection: Axis.horizontal,
-                                child: addBottomMargin(coreTable))))
+                                controller: coreVerticalController,
+                                scrollDirection: Axis.vertical,
+                                child: SingleChildScrollView(
+                                    controller: coreHorizontalController,
+                                    scrollDirection: Axis.horizontal,
+                                    child: addBottomMargin(coreTable)))))
                   ]));
 
               fixedColumnAndCornerCol = fixedTopLeftCornerTable == null &&
@@ -1055,6 +1133,7 @@ class DataTable2 extends DataTable {
           onCheckboxChanged: (bool? checked) =>
               _handleSelectAll(checked, someChecked),
           overlayColor: null,
+          checkboxTheme: headingCheckboxTheme,
           tristate: true,
           rowHeight: headingHeight);
 
@@ -1088,6 +1167,7 @@ class DataTable2 extends DataTable {
             },
             onCheckboxChanged: row.onSelectChanged,
             overlayColor: row.color ?? effectiveDataRowColor,
+            checkboxTheme: datarowCheckboxTheme,
             tristate: false,
             rowHeight: rows[rowIndex] is DataRow2
                 ? (rows[rowIndex] as DataRow2).specificRowHeight
@@ -1282,6 +1362,15 @@ class DataTable2 extends DataTable {
               ))
             : null,
         color: effectiveHeadingRowColor?.resolve(<MaterialState>{}),
+      ).copyWith(
+        color: headingRowDecoration?.color,
+        image: headingRowDecoration?.image,
+        border: headingRowDecoration?.border,
+        borderRadius: headingRowDecoration?.borderRadius,
+        boxShadow: headingRowDecoration?.boxShadow,
+        gradient: headingRowDecoration?.gradient,
+        backgroundBlendMode: headingRowDecoration?.backgroundBlendMode,
+        shape: headingRowDecoration?.shape,
       ),
       children: List<Widget>.filled(numberOfCols, const _NullWidget()),
     );
@@ -1583,56 +1672,4 @@ class SyncedScrollControllersState extends State<SyncedScrollControllers> {
   @override
   Widget build(BuildContext context) =>
       widget.builder(context, _sc11!, _sc12, _sc21!, _sc22);
-}
-
-// TODO: revert back to SDK's TableRowInkWell as soon as it has secondary taps added
-class _TableRowInkWell extends InkResponse {
-  /// Creates an ink well for a table row.
-  const _TableRowInkWell({
-    super.child,
-    super.onTap,
-    super.onDoubleTap,
-    super.onLongPress,
-    super.onSecondaryTap,
-    super.onSecondaryTapDown,
-    super.overlayColor,
-  }) : super(
-          containedInkWell: true,
-          highlightShape: BoxShape.rectangle,
-        );
-
-  @override
-  RectCallback getRectCallback(RenderBox referenceBox) {
-    return () {
-      RenderObject cell = referenceBox;
-      AbstractNode? table = cell.parent;
-      final Matrix4 transform = Matrix4.identity();
-      while (table is RenderObject && table is! RenderTable) {
-        table.applyPaintTransform(cell, transform);
-        assert(table == cell.parent);
-        cell = table;
-        table = table.parent;
-      }
-      if (table is RenderTable) {
-        final TableCellParentData cellParentData =
-            cell.parentData! as TableCellParentData;
-        assert(cellParentData.y != null);
-        final Rect rect = table.getRowBox(cellParentData.y!);
-        // The rect is in the table's coordinate space. We need to change it to the
-        // TableRowInkWell's coordinate space.
-        table.applyPaintTransform(cell, transform);
-        final Offset? offset = MatrixUtils.getAsTranslation(transform);
-        if (offset != null) {
-          return rect.shift(-offset);
-        }
-      }
-      return Rect.zero;
-    };
-  }
-
-  @override
-  bool debugCheckContext(BuildContext context) {
-    assert(debugCheckHasTable(context));
-    return super.debugCheckContext(context);
-  }
 }

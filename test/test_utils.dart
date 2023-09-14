@@ -7,7 +7,6 @@
 // ignore_for_file: avoid_print
 
 import 'package:data_table_2/data_table_2.dart';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -151,6 +150,7 @@ DataTable2 buildTable(
     Color? fixedColumnsColor,
     Color? fixedCornerColor,
     Color? headingRowColor,
+    BoxDecoration? headingRowDecoration,
     double? dividerThickness,
     bool showBottomBorder = false,
     TableBorder? border,
@@ -159,6 +159,8 @@ DataTable2 buildTable(
     bool showCheckboxColumn = true,
     ScrollController? scrollController,
     ScrollController? horizontalScrollController,
+    bool? isHorizontalScrollBarVisible,
+    bool? isVerticalScrollBarVisible,
     List<DataColumn2>? columns,
     List<DataRow2>? rows}) {
   return DataTable2(
@@ -169,6 +171,7 @@ DataTable2 buildTable(
     sortAscending: sortAscending,
     sortArrowIcon: sortArrowIcon ?? Icons.arrow_upward,
     headingRowColor: MaterialStatePropertyAll(headingRowColor),
+    headingRowDecoration: headingRowDecoration,
     sortArrowAnimationDuration:
         sortArrowAnimationDuration ?? const Duration(milliseconds: 150),
     minWidth: minWidth,
@@ -184,6 +187,8 @@ DataTable2 buildTable(
     columns: columns ?? testColumns,
     scrollController: scrollController,
     horizontalScrollController: horizontalScrollController,
+    isHorizontalScrollBarVisible: isHorizontalScrollBarVisible,
+    isVerticalScrollBarVisible: isVerticalScrollBarVisible,
     smRatio: overrideSizes ? 0.5 : 0.67,
     lmRatio: overrideSizes ? 1.5 : 1.2,
     rows: rows ?? testRows,
@@ -275,6 +280,7 @@ PaginatedDataTable2 buildPaginatedTable(
     ScrollController? scrollController,
     ScrollController? horizontalScrollController,
     MaterialStateProperty<Color?>? headingRowColor,
+    BoxDecoration? headingRowDecoration,
     double? minWidth,
     Function(int?)? onRowsPerPageChanged,
     List<DataColumn2>? columns}) {
@@ -294,6 +300,7 @@ PaginatedDataTable2 buildPaginatedTable(
     controller: controller,
     border: border,
     headingRowColor: headingRowColor,
+    headingRowDecoration: headingRowDecoration,
     fixedColumnsColor: fixedColumnsColor,
     fixedCornerColor: fixedCornerColor,
     fixedLeftColumns: fixedLeftColumns,
@@ -331,6 +338,7 @@ PaginatedDataTable2 buildAsyncPaginatedTable(
     int fixedTopRows = 1,
     int fixedLeftColumns = 0,
     Color? headingRowColor,
+    BoxDecoration? headingRowDecoration,
     Color? fixedColumnsColor,
     Color? fixedCornerColor,
     bool showHeader = false,
@@ -361,6 +369,7 @@ PaginatedDataTable2 buildAsyncPaginatedTable(
     wrapInCard: wrapInCard,
     fixedTopRows: fixedTopRows,
     headingRowColor: MaterialStatePropertyAll(headingRowColor),
+    headingRowDecoration: headingRowDecoration,
     fixedColumnsColor: fixedColumnsColor,
     fixedLeftColumns: fixedLeftColumns,
     fixedCornerColor: fixedCornerColor,
@@ -587,3 +596,108 @@ List<Dessert> _dessertsX3 = _desserts.toList()
       i.carbs, i.protein, i.sodium, i.calcium, i.iron)))
   ..addAll(_desserts.map((i) => Dessert('${i.name} x3', i.calories, i.fat,
       i.carbs, i.protein, i.sodium, i.calcium, i.iron)));
+
+class WidgetChildTypeFinder extends ChainedFinder {
+  WidgetChildTypeFinder(Finder parent, this.childType) : super(parent);
+
+  final Type childType;
+
+  @override
+  String get description =>
+      '${parent.description} (considering only types of children)';
+
+  @override
+  Iterable<Element> filter(Iterable<Element> parentCandidates) sync* {
+    for (final Element candidate in parentCandidates) {
+      var elements = collectAllElementsFrom(candidate, skipOffstage: false);
+      for (var e in elements) {
+        if (e.widget.runtimeType == childType) {
+          yield e;
+        }
+      }
+    }
+  }
+}
+
+class WidgetChildTextFinder extends ChainedFinder {
+  WidgetChildTextFinder(Finder parent, this.childTextIncludes) : super(parent);
+
+  final String? childTextIncludes;
+
+  @override
+  String get description =>
+      '${parent.description} (considering only types of children)';
+
+  @override
+  Iterable<Element> filter(Iterable<Element> parentCandidates) sync* {
+    for (final Element candidate in parentCandidates) {
+      var elements = collectAllElementsFrom(candidate, skipOffstage: false);
+      for (var e in elements) {
+        if ((e.widget.runtimeType == Text &&
+                (e.widget as Text).data!.contains(childTextIncludes!)) ||
+            ((e.widget.runtimeType == SelectableText &&
+                (e.widget as SelectableText).data != null &&
+                (e.widget as SelectableText)
+                    .data!
+                    .contains(childTextIncludes!)))) {
+          yield e;
+        }
+      }
+    }
+  }
+}
+
+class WidgetChildIconFinder extends ChainedFinder {
+  WidgetChildIconFinder(Finder parent, this.iconData) : super(parent);
+
+  final IconData iconData;
+
+  @override
+  String get description =>
+      '${parent.description} (considering only types of children)';
+
+  @override
+  Iterable<Element> filter(Iterable<Element> parentCandidates) sync* {
+    for (final Element candidate in parentCandidates) {
+      var elements = collectAllElementsFrom(candidate, skipOffstage: false);
+      for (var e in elements) {
+        if (e.widget is Icon && (e.widget as Icon).icon == iconData) {
+          yield e;
+        }
+      }
+    }
+  }
+}
+
+class WidgetChildSemanticsFinder extends ChainedFinder {
+  WidgetChildSemanticsFinder(Finder parent, this.tooltip) : super(parent);
+
+  final String tooltip;
+
+  @override
+  String get description =>
+      '${parent.description} (considering only types of children)';
+
+  @override
+  Iterable<Element> filter(Iterable<Element> parentCandidates) sync* {
+    for (final Element candidate in parentCandidates) {
+      var elements = collectAllElementsFrom(candidate, skipOffstage: false);
+      for (var e in elements) {
+        if (e.widget is Semantics &&
+            (e.widget as Semantics).properties.tooltip == tooltip) {
+          yield e;
+        }
+      }
+    }
+  }
+}
+
+extension ExtraFinders on Finder {
+  Finder byChildType(Type childType) => WidgetChildTypeFinder(this, childType);
+  Finder byChildTextIncludes(String? childTextIncludes) =>
+      WidgetChildTextFinder(this, childTextIncludes);
+  Finder byChildIcon(IconData iconData) =>
+      WidgetChildIconFinder(this, iconData);
+  Finder byChildSemantics(String tooltip) =>
+      WidgetChildSemanticsFinder(this, tooltip);
+}
